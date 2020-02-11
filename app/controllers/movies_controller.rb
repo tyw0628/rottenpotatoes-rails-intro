@@ -1,7 +1,20 @@
 class MoviesController < ApplicationController
-
+  def initialize
+    super
+    @all_ratings = get_ratings
+  end
+  
+  def get_ratings
+    ['G','PG','PG-13','R','NC-17'].map{|a| a}
+  end
+  
   def movie_params
     params.require(:movie).permit(:title, :rating, :description, :release_date)
+  end
+
+  def clear
+    session.clear
+    redirect_to movies_path  
   end
 
   def show
@@ -10,8 +23,37 @@ class MoviesController < ApplicationController
     # will render app/views/movies/show.<extension> by default
   end
 
+  def sort_state
+    @sort = params[:sort]
+    if params[:sort].nil?
+      @sort =  (session[:sort].nil?) ? :unsorted : session[:sort]
+    end
+    @sort
+  end
+
+  def filter_state
+    @filter = session[:filter]
+    if params[:commit] == 'Refresh'
+      @filter = params[:ratings].keys unless params[:ratings].nil?
+    end
+    @filter = @all_ratings if @filter.nil?
+    @filter
+  end
+
+
   def index
-    @movies = Movie.all
+     session[:sort] = sort_state
+     session[:filter] = filter_state
+
+    if params[:sort].nil? or params[:filter].nil?
+      params[:ratings] = @filter
+      params[:sort] = @sort
+      redirect_to movies_path(sort: @sort, filter: @filter)
+      return
+    end
+    
+    @movies = Movie.where("rating IN (?)", @filter)
+    @movies = @movies.order(@sort) unless @sort.nil? or @sort=='unsorted'
   end
 
   def new
